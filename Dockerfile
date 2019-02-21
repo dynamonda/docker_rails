@@ -30,7 +30,28 @@ RUN sed -i -e "s/gem 'sqlite3'/gem 'sqlite3', '~> 1.3.6'/" Gemfile
 RUN bundle install
 RUN rails db:create
 
+# httpd, Passenger
+RUN yum install -y httpd libcurl-devel httpd-devel apr-devel apr-util-devel
+RUN gem install passenger
+RUN passenger-install-apache2-module --auto > passenger.log
+RUN sed -n 560,564p passenger.log > /etc/httpd/conf.d/passenger.conf
+RUN sed -i '95a ServerName localhost:80' /etc/httpd/conf/httpd.conf
+RUN echo $'<VirtualHost *:80> \n\
+  ServerName localhost:80 \n\
+  DocumentRoot /railsproject/public \n\
+  PassengerEnabled on \n\
+  ErrorLog /var/log/httpd/error_log \n\
+  CustomLog /var/log/httpd/access_log combined \n\
+  \n\
+  <Directory /railsproject/public> \n\
+    AllowOverride all \n\
+    Options -MultiViews \n\
+  </Directory> \n\
+</VirtualHost>' > /etc/httpd/conf.d/rails.conf
+
 EXPOSE 3000
 
-CMD ["rails", "server", "-b", "0.0.0.0"]
+#CMD ["rails", "server", "-b", "0.0.0.0"]
+#CMD ["/usr/sbin/httpd", "-DFOREGROUND"]
+CMD ["passenger", "start"]
 
